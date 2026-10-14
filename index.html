@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gruselhof">
+<meta name="theme-color" content="#1c1824">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>Gruselhof</title>
+<style>
+@font-face{font-family:'Pirata One';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/pirata-one-400.woff2) format('woff2')}
+@font-face{font-family:'Alegreya Sans';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/alegreya-sans-400.woff2) format('woff2')}
+@font-face{font-family:'Alegreya Sans';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/alegreya-sans-500.woff2) format('woff2')}
+@font-face{font-family:'Alegreya Sans';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/alegreya-sans-700.woff2) format('woff2')}
+html{background:#1c1824;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);overscroll-behavior:none;touch-action:manipulation}
+[hidden]{display:none !important}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* Layout: one-screen phone app. Header with level bar, one scrolling view in the middle (farm grid, army roster, raid targets), tab bar at the bottom, bottom sheets for details.
+   Palette: aubergine night, peat soil, lantern amber. Single dark world by choice. */
+:root{
+  --night:#1c1824; --panel:#292232; --panel-2:#342b3f; --line:#463b55;
+  --bone:#ece4d0; --mist:#aaa2bb; --ink:#241c2c;
+  --amber:#f2b84b; --amber-ink:#2a1c05;
+  --turf:#27301f; --soil:#4d3a29; --soil-2:#3c2d20; --wild:#2f3d27;
+  --moss:#86a45c; --rust:#cf6a52; --ok:#97c872;
+  --font-display:'Pirata One', Georgia, serif;
+  --font-body:'Alegreya Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  margin:0; background:var(--night); color:var(--bone);
+  font:16px/1.4 var(--font-body);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  -webkit-text-size-adjust:100%;
+}
+*{box-sizing:border-box}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--amber); outline-offset:2px}
+
+.app{position:relative; height:100%; max-width:480px; margin:0 auto; display:flex; flex-direction:column}
+
+/* header */
+.hud{padding-top:10px; flex:none}
+.hud-top{display:flex; align-items:center; justify-content:space-between; gap:12px}
+h1{font:400 32px/1 var(--font-display); margin:0; letter-spacing:.01em}
+h2{font:400 24px/1.1 var(--font-display); margin:0 0 4px}
+.chips{display:flex; gap:8px}
+.chip{display:inline-flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:99px; padding:4px 12px 4px 8px; font-weight:700; font-variant-numeric:tabular-nums}
+.chip svg{width:18px; height:18px; flex:none}
+.lvl{display:flex; align-items:center; gap:10px; margin-top:8px; font-size:13px; color:var(--mist); font-variant-numeric:tabular-nums}
+.lvl b{color:var(--bone)}
+.xp{flex:1; height:6px; border-radius:9px; background:var(--panel-2); overflow:hidden}
+.xp i{display:block; height:100%; width:0; background:var(--moss); transition:width .3s}
+
+/* views */
+main{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 0 16px}
+.muted{color:var(--mist); margin:0 0 12px; font-size:15px}
+.fine{color:var(--mist); font-size:13px; margin:12px 0 0}
+
+.seeds{display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; margin:0 -2px}
+.seed{flex:0 0 auto; width:92px; background:var(--panel); border:1.5px solid var(--line); border-radius:12px; padding:6px 6px 8px; color:var(--bone); text-align:center; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; touch-action:manipulation}
+.seed svg{width:44px; height:44px}
+.seed .n{font-weight:700; font-size:13px; line-height:1.15}
+.seed .m{font-size:12px; color:var(--mist); font-variant-numeric:tabular-nums}
+.seed[aria-pressed=true]{border-color:var(--amber); background:var(--panel-2)}
+.seed.lock{opacity:.45}
+.seed.poor .m b{color:var(--rust)}
+
+.farm{display:grid; grid-template-columns:repeat(5,1fr); gap:5px; padding:8px; background:var(--turf); border:1px solid #384a2c; border-radius:16px}
+.plot{position:relative; aspect-ratio:1; border:0; padding:0; border-radius:10px; background:var(--soil); overflow:hidden; color:var(--bone); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation}
+.plot.empty{background:repeating-linear-gradient(0deg, var(--soil) 0 9px, var(--soil-2) 9px 11px)}
+.plot.locked{background:var(--wild); box-shadow:inset 0 0 0 1px #3e4f34}
+.plot.grow{background:linear-gradient(var(--soil-2), var(--soil))}
+.plot svg.pl{position:absolute; inset:0; width:100%; height:100%}
+.plot .plus{position:absolute; inset:0; display:grid; place-items:center; font-size:26px; color:#ffffff33}
+.plot .timer{position:absolute; left:0; right:0; bottom:3px; text-align:center; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; text-shadow:0 1px 2px #000b}
+.plot.ready .timer{color:var(--amber); font-size:12px}
+.plot .price{position:absolute; left:50%; bottom:4px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; background:#171f13cc; padding:1px 7px; border-radius:99px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums}
+.plot .price::before{content:''; width:8px; height:8px; border-radius:50%; background:var(--amber)}
+.plot.ready{box-shadow:0 0 0 2px var(--amber), 0 0 12px 2px #f2b84b44; animation:pulse 1.6s ease-in-out infinite}
+.plot.ready svg.pl{animation:bob 1.3s ease-in-out infinite}
+.float{position:absolute; left:50%; top:28%; transform:translateX(-50%); font-weight:700; font-size:13px; color:var(--amber); pointer-events:none; white-space:nowrap; text-shadow:0 1px 3px #000; animation:floatup .9s ease-out forwards}
+
+.farm-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px}
+.farm-foot span{color:var(--mist); font-size:14px}
+
+.btn{font:700 15px var(--font-body); min-height:44px; padding:0 18px; border-radius:12px; border:0; background:var(--amber); color:var(--amber-ink); cursor:pointer; touch-action:manipulation}
+.btn:disabled{opacity:.4; cursor:default}
+.btn.ghost{background:transparent; color:var(--bone); border:1.5px solid var(--line)}
+.btn.danger{color:var(--rust); border-color:#6c3b36}
+.btn.small{min-height:36px; padding:0 12px; font-size:14px}
+
+.rows{display:flex; flex-direction:column; gap:8px}
+.row{display:grid; grid-template-columns:48px 1fr auto; gap:4px 12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 12px}
+.row svg.z{width:48px; height:48px}
+.row .t{font-weight:700}
+.row .s{font-size:13px; color:var(--mist)}
+.row .count{font:400 28px/1 var(--font-display); text-align:right; font-variant-numeric:tabular-nums}
+.row .sells{grid-column:1 / -1; display:flex; justify-content:flex-end; gap:8px}
+.row.none{opacity:.5}
+.reset{margin-top:20px; display:flex; justify-content:center}
+
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:6px}
+.card h3{font:400 24px/1.1 var(--font-display); margin:0}
+.card p{margin:0; color:var(--mist); font-size:14px}
+.card .foes{color:var(--bone)}
+.card .foot{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:4px}
+.card.lock{opacity:.5}
+.rew{display:flex; gap:12px; flex-wrap:wrap; font-size:14px; font-weight:700; font-variant-numeric:tabular-nums}
+.pct{font-weight:700; font-size:14px}
+.pct.hi{color:var(--ok)} .pct.mid{color:var(--amber)} .pct.lo{color:var(--rust)}
+
+/* tabs */
+.tabs{flex:none; display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px 0 10px; border-top:1px solid var(--line)}
+.tab{background:none; border:0; color:var(--mist); font:700 13px var(--font-body); padding:6px 4px; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:50px; cursor:pointer; touch-action:manipulation}
+.tab svg{width:22px; height:22px}
+.tab[aria-selected=true]{color:var(--amber); background:var(--panel)}
+
+/* sheet */
+.sheet{position:fixed; inset:0; z-index:20; display:flex; align-items:flex-end; justify-content:center}
+.scrim{position:absolute; inset:0; background:#0009}
+.panel{position:relative; width:100%; max-width:520px; max-height:88%; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; padding-top:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); animation:up .22s ease-out}
+.panel:focus{outline:none}
+.bar{height:10px; border-radius:9px; background:var(--panel-2); overflow:hidden; margin:12px 0 10px}
+.bar i{display:block; height:100%; width:0; background:var(--moss)}
+.big{font:400 36px/1 var(--font-display); margin:2px 0 16px; font-variant-numeric:tabular-nums}
+.btns{display:flex; gap:10px; flex-wrap:wrap}
+.btns .btn{flex:1 1 140px}
+.sq{display:grid; grid-template-columns:40px 1fr auto; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line)}
+.sq svg{width:40px; height:40px}
+.sq small{display:block; color:var(--mist); font-size:12px}
+.step{display:flex; align-items:center; gap:6px}
+.step button{width:40px; height:40px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel-2); color:var(--bone); font:700 20px var(--font-body); cursor:pointer; touch-action:manipulation}
+.step span{min-width:48px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums}
+.step span small{display:inline; font-weight:400}
+.sum{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:12px 0 4px; font-size:14px; color:var(--mist); font-variant-numeric:tabular-nums}
+.chance{font-size:18px; font-weight:700; margin:4px 0 12px}
+.log{max-height:150px; overflow-y:auto; background:var(--night); border-radius:10px; padding:8px 10px; font-size:13px; color:var(--mist); margin:10px 0 14px; font-variant-numeric:tabular-nums}
+.log div+div{margin-top:3px}
+.result-h{font:400 34px/1 var(--font-display); margin:0 0 8px}
+.result-h.win{color:var(--amber)} .result-h.lose{color:var(--rust)}
+.lines p{margin:0 0 6px}
+
+.toast{position:absolute; left:50%; bottom:84px; transform:translateX(-50%) translateY(8px); background:var(--bone); color:var(--ink); padding:8px 16px; border-radius:99px; font-weight:700; font-size:14px; text-align:center; max-width:94%; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:10}
+.toast.on{opacity:1; transform:translateX(-50%)}
+
+@keyframes pulse{0%,100%{box-shadow:0 0 0 2px var(--amber), 0 0 8px 0 #f2b84b33}50%{box-shadow:0 0 0 2px var(--amber), 0 0 18px 4px #f2b84b66}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes floatup{from{opacity:1; transform:translate(-50%,0)}to{opacity:0; transform:translate(-50%,-34px)}}
+@keyframes up{from{transform:translateY(30px); opacity:0}to{transform:none; opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="hud">
+    <div class="hud-top">
+      <h1>Gruselhof</h1>
+      <div class="chips">
+        <span class="chip" id="chipCoins" aria-label="Münzen">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="#f2b84b"/><circle cx="10" cy="10" r="5.5" fill="none" stroke="#b8821f" stroke-width="1.6"/></svg>
+          <b id="coins">0</b>
+        </span>
+        <span class="chip" id="chipBrains" aria-label="Hirne">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5C8.5 2 5.5 2.6 5 5c-2 .3-2.8 2.6-1.8 4.1C2.3 10.4 3 12.7 5 13c.3 1.9 2.3 3 4 2.3.4.3.7.4 1 .4s.6-.1 1-.4c1.7.7 3.7-.4 4-2.3 2-.3 2.7-2.6 1.8-3.9C17.8 7.6 17 5.3 15 5c-.5-2.4-3.5-3-5-1.5z" fill="#d98aa0"/><path d="M10 4v12M6.5 8.5c1.2 0 2 .8 2 2M13.5 8.5c-1.2 0-2 .8-2 2" stroke="#8d4a62" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>
+          <b id="brains">0</b>
+        </span>
+      </div>
+    </div>
+    <div class="lvl"><span>Stufe <b id="lvl">1</b></span><div class="xp"><i id="xpbar"></i></div><span id="xptxt"></span></div>
+  </header>
+
+  <main id="main">
+    <section id="v-farm">
+      <div class="seeds" id="seeds" role="group" aria-label="Samen"></div>
+      <div class="farm" id="farm"></div>
+      <div class="farm-foot"><span id="footinfo"></span><button class="btn" id="harvestAll" type="button">Alle ernten</button></div>
+    </section>
+    <section id="v-army" hidden></section>
+    <section id="v-raid" hidden></section>
+  </main>
+
+  <nav class="tabs" role="tablist" aria-label="Bereiche">
+    <button class="tab" role="tab" data-view="farm" aria-selected="true" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11"/><path d="M9 20v-6h6v6"/></svg>Hof
+    </button>
+    <button class="tab" role="tab" data-view="army" aria-selected="false" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a8 8 0 00-5 14v3h10v-3a8 8 0 00-5-14z"/><circle cx="9" cy="11" r="1.5"/><circle cx="15" cy="11" r="1.5"/><path d="M10 20v-2M14 20v-2"/></svg>Heer
+    </button>
+    <button class="tab" role="tab" data-view="raid" aria-selected="false" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/><path d="M3 8l5-5M16 21l5-5"/></svg>Raubzug
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-close></div>
+  <div class="panel" id="panel" role="dialog" aria-modal="true" tabindex="-1"><div id="sheetBody"></div></div>
+</div>
+
+<script>
+const KEY = 'gruselhof.v1', COLS = 5, ROWS = 6, N = COLS * ROWS;
+
+/* ---------- Daten ---------- */
+const SEEDS = [
+  {id:'schlurfer', name:'Schlurfer',      cost:10,  time:15,  atk:3,  hp:12,  lvl:1},
+  {id:'moor',      name:'Moorleiche',     cost:25,  time:40,  atk:5,  hp:18,  lvl:2},
+  {id:'graeber',   name:'Totengräber',    cost:60,  time:90,  atk:9,  hp:30,  lvl:3},
+  {id:'spucker',   name:'Fäulnisspucker', cost:120, time:180, atk:16, hp:26,  lvl:5},
+  {id:'sarg',      name:'Sargträger',     cost:220, time:360, atk:14, hp:80,  lvl:7},
+  {id:'fuerst',    name:'Knochenfürst',   cost:500, time:720, atk:30, hp:120, lvl:9}
+];
+SEEDS.forEach(s => { s.sell = Math.round(s.cost * 1.4); });
+const SEED = Object.fromEntries(SEEDS.map(s => [s.id, s]));
+
+const ENEMIES = [
+  {id:'mob',         name:'Fackelmob',       text:'Dorfbewohner mit Heugabeln und Fackeln.',        lvl:1, groups:[{name:'Dorfbub', n:4, atk:2, hp:9}], coins:35, xp:14, brain:.15},
+  {id:'wilderer',    name:'Moorwilderer',    text:'Sie jagen alles, was sich im Nebel bewegt.',     lvl:2, groups:[{name:'Wilderer', n:4, atk:6, hp:18}], coins:75, xp:26, brain:.2},
+  {id:'miliz',       name:'Dorfmiliz',       text:'Gut gedrillt und schlecht gelaunt.',             lvl:3, groups:[{name:'Milizionär', n:6, atk:8, hp:24},{name:'Hauptmann', n:1, atk:12, hp:50}], coins:160, xp:50, brain:.3},
+  {id:'jaeger',      name:'Jägertrupp',      text:'Silberpfeile und scharfe Hunde.',                lvl:5, groups:[{name:'Jäger', n:8, atk:12, hp:28},{name:'Jagdhund', n:4, atk:7, hp:14}], coins:330, xp:95, brain:.4},
+  {id:'kloster',     name:'Klosterwache',    text:'Geweihtes Wasser und dicke Mauern.',             lvl:7, groups:[{name:'Mönch', n:8, atk:11, hp:48},{name:'Prior', n:3, atk:16, hp:65}], coins:680, xp:170, brain:.5},
+  {id:'inquisition', name:'Die Inquisition', text:'Sie räumen auf, wo andere längst aufgegeben haben.', lvl:9, groups:[{name:'Inquisitor', n:14, atk:16, hp:56},{name:'Großinquisitor', n:2, atk:32, hp:150}], coins:1500, xp:420, brain:1, brainN:2}
+];
+const ENEMY = Object.fromEntries(ENEMIES.map(e => [e.id, e]));
+
+const xpNeed = l => Math.round(30 * Math.pow(l, 1.5));
+const xpHarvest = s => Math.round(s.cost / 3) + 1;
+const nf = new Intl.NumberFormat('de-DE');
+const fmtN = n => nf.format(Math.round(n));
+function fmt(s){
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  const p = v => String(v).padStart(2, '0');
+  return h ? h + ':' + p(m) + ':' + p(x) : m + ':' + p(x);
+}
+
+/* ---------- Zombie-Grafik ---------- */
+const INK = '#1d1722', EYE = '#efe9d0';
+function zbody(id){
+  switch(id){
+    case 'schlurfer': return `
+      <path d="M8 64C8 51 18 46 32 46S56 51 56 64Z" fill="#6b5a7a"/>
+      <path d="M20 46l4 7 4-7M34 46l4 7 4-7" fill="#52445f"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#6f8660"/>
+      <rect x="17" y="13" width="30" height="31" rx="13" fill="#9fb58a"/>
+      <path d="M24 14l-2-6M32 13V6M40 14l2-6" stroke="#6f8660" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M44 20l-4 5" stroke="#6f8660" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="25.5" cy="27" r="5" fill="${EYE}"/><circle cx="39" cy="28" r="3.6" fill="${EYE}"/>
+      <circle cx="26.5" cy="28" r="1.9" fill="${INK}"/><circle cx="38" cy="29" r="1.5" fill="${INK}"/>
+      <path d="M25 37q7 4 14-1" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <rect x="29" y="37.5" width="3" height="3.5" fill="${EYE}"/>`;
+    case 'moor': return `
+      <path d="M8 64C8 51 18 46 32 46S56 51 56 64Z" fill="#3f5a3c"/>
+      <path d="M14 58q6-4 10 0M38 55q6-3 11 1" stroke="#2e4430" stroke-width="2" fill="none"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#54787a"/>
+      <rect x="17" y="14" width="30" height="30" rx="13" fill="#7fa6a3"/>
+      <path d="M24 16V6M31 15V4M38 16V7" stroke="#8aa05a" stroke-width="2.2" stroke-linecap="round"/>
+      <ellipse cx="24" cy="6" rx="2" ry="3" fill="#6b4a32"/><ellipse cx="31" cy="4.5" rx="2" ry="3" fill="#6b4a32"/><ellipse cx="38" cy="7" rx="2" ry="3" fill="#6b4a32"/>
+      <ellipse cx="41" cy="35" rx="5" ry="3.5" fill="#5f7a3d" opacity=".85"/>
+      <circle cx="26" cy="27" r="4" fill="${EYE}"/><circle cx="38" cy="27" r="4" fill="${EYE}"/>
+      <circle cx="26" cy="28" r="1.6" fill="${INK}"/><circle cx="38" cy="28" r="1.6" fill="${INK}"/>
+      <ellipse cx="32" cy="38" rx="4.5" ry="3.2" fill="${INK}"/>`;
+    case 'graeber': return `
+      <path d="M54 30V64" stroke="#7a5a3a" stroke-width="3" stroke-linecap="round"/>
+      <path d="M49 20h10l-1.5 11h-7z" fill="#9aa0ab"/>
+      <path d="M8 64C8 51 18 46 32 46S56 51 56 64Z" fill="#4a4f5c"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#8d7352"/>
+      <rect x="17" y="14" width="30" height="30" rx="12" fill="#c3a47e"/>
+      <path d="M15 25Q16 8 32 8Q48 8 49 25Z" fill="#5c4a35"/>
+      <rect x="12" y="22" width="28" height="4" rx="2" fill="#473826"/>
+      <circle cx="26" cy="31" r="4.2" fill="#8d7352"/><circle cx="38" cy="31" r="4.2" fill="#8d7352"/>
+      <circle cx="26" cy="31" r="2.6" fill="${EYE}"/><circle cx="38" cy="31" r="2.6" fill="${EYE}"/>
+      <circle cx="26" cy="31.5" r="1.1" fill="${INK}"/><circle cx="38" cy="31.5" r="1.1" fill="${INK}"/>
+      <path d="M26 40h12" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="24" cy="41" r=".8" fill="#8d7352"/><circle cx="28" cy="43" r=".8" fill="#8d7352"/><circle cx="36" cy="43" r=".8" fill="#8d7352"/><circle cx="40" cy="41" r=".8" fill="#8d7352"/>`;
+    case 'spucker': return `
+      <path d="M8 64C8 51 18 46 32 46S56 51 56 64Z" fill="#7a4a3a"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#8a9a3e"/>
+      <rect x="17" y="14" width="30" height="30" rx="13" fill="#b4c260"/>
+      <circle cx="20" cy="37" r="6" fill="#b4c260"/><circle cx="44" cy="37" r="6" fill="#b4c260"/>
+      <circle cx="26" cy="26" r="4.6" fill="${EYE}"/><circle cx="38" cy="26" r="4.6" fill="${EYE}"/>
+      <circle cx="26" cy="26.5" r="2" fill="#b5382b"/><circle cx="38" cy="26.5" r="2" fill="#b5382b"/>
+      <ellipse cx="32" cy="38" rx="7" ry="5" fill="${INK}"/>
+      <path d="M29 42q1 9 3 9t3-9z" fill="#b9d94a"/>`;
+    case 'sarg': return `
+      <path d="M16 5h32l9 19-7 40H14L7 24z" fill="#6b4a32" stroke="#4a3322" stroke-width="2"/>
+      <circle cx="14" cy="16" r="1.6" fill="#c9b79a"/><circle cx="50" cy="16" r="1.6" fill="#c9b79a"/><circle cx="12" cy="44" r="1.6" fill="#c9b79a"/><circle cx="52" cy="44" r="1.6" fill="#c9b79a"/>
+      <path d="M10 64C10 52 20 47 32 47S54 52 54 64Z" fill="#3d3947"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#77746f"/>
+      <rect x="17" y="14" width="30" height="30" rx="12" fill="#a8a5a0"/>
+      <ellipse cx="26" cy="28" rx="4.6" ry="3.6" fill="${EYE}"/><ellipse cx="38" cy="28" rx="4.6" ry="3.6" fill="${EYE}"/>
+      <circle cx="26" cy="29.4" r="1.5" fill="${INK}"/><circle cx="38" cy="29.4" r="1.5" fill="${INK}"/>
+      <path d="M21.4 28a4.6 4.6 0 019.2 0zM33.4 28a4.6 4.6 0 019.2 0z" fill="#77746f"/>
+      <path d="M26 40q6-3 12 0" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    case 'fuerst': return `
+      <path d="M6 64C6 50 18 46 32 46S58 50 58 64Z" fill="#5a1f2b"/>
+      <path d="M22 47l10 12 10-12" stroke="#e8b23a" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+      <rect x="27" y="40" width="10" height="9" rx="3" fill="#b9b095"/>
+      <rect x="17" y="14" width="30" height="30" rx="12" fill="#efe8d2"/>
+      <ellipse cx="25.5" cy="28" rx="5" ry="5.5" fill="${INK}"/><ellipse cx="38.5" cy="28" rx="5" ry="5.5" fill="${INK}"/>
+      <circle cx="25.5" cy="28.5" r="1.9" fill="#e5553f"/><circle cx="38.5" cy="28.5" r="1.9" fill="#e5553f"/>
+      <path d="M32 33l-2.5 5h5z" fill="${INK}"/>
+      <rect x="24" y="39" width="16" height="5" rx="1.5" fill="#efe8d2" stroke="${INK}" stroke-width="1.5"/>
+      <path d="M28 39v5M32 39v5M36 39v5" stroke="${INK}" stroke-width="1.2"/>
+      <path d="M17 17L19 5l7 7 6-9 6 9 7-7 2 12z" fill="#e8b23a"/>
+      <rect x="17" y="15" width="30" height="3" fill="#c8922a"/>`;
+  }
+  return '';
+}
+const zart = (id, cls) => `<svg class="z ${cls || ''}" viewBox="0 0 64 64" aria-hidden="true">${zbody(id)}</svg>`;
+const WEED = `<svg class="pl" viewBox="0 0 64 64" aria-hidden="true"><path d="M6 50L10 30 16 44 21 24 27 44 33 20 39 44 45 26 50 44 55 32 58 50Z" fill="#5b7f42"/><path d="M4 56L9 40 14 52 20 38 26 52 32 42 38 52 44 40 50 52 55 41 60 56Z" fill="#46663a"/></svg>`;
+function plotSVG(i, seed){
+  return `<svg class="pl" viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="cl${i}"><rect x="0" y="0" width="64" height="52"/></clipPath></defs>
+    <g clip-path="url(#cl${i})"><g class="rise">${zbody(seed)}</g></g>
+    <path d="M3 64Q9 51 32 50Q55 51 61 64Z" fill="#33261b"/>
+    <path d="M12 60q4-3 8-1M38 57q5-2 9 1M26 62q3-2 6 0" stroke="#4d3a29" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`;
+}
+
+/* ---------- Kampf ---------- */
+function fight(allies, foes, wantLog){
+  const mk = (list, side) => { const a = list.map(u => ({type:u.type, atk:u.atk, hp:u.hp, side})); a.forEach((u, i) => { u.pos = i; }); return a; };
+  const A = mk(allies, 'a'), B = mk(foes, 'b');
+  const liveA = A.slice(), liveB = B.slice();
+  const kill = (u, live) => { const last = live[live.length - 1]; live[u.pos] = last; last.pos = u.pos; live.pop(); u.pos = -1; };
+  const log = []; let r = 0;
+  while(r < 40 && liveA.length && liveB.length){
+    r++;
+    let dA = 0, dB = 0;
+    const order = liveA.concat(liveB);
+    for(let i = order.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; const t = order[i]; order[i] = order[j]; order[j] = t; }
+    for(const u of order){
+      if(u.pos < 0) continue;
+      const mine = u.side === 'a' ? liveA : liveB;
+      const theirs = u.side === 'a' ? liveB : liveA;
+      if(!theirs.length) break;
+      const t = theirs[(Math.random() * theirs.length) | 0];
+      const dmg = Math.max(1, Math.round(u.atk * (0.75 + Math.random() * 0.5)));
+      t.hp -= dmg;
+      if(u.side === 'a') dA += dmg; else dB += dmg;
+      if(t.hp <= 0) kill(t, theirs);
+    }
+    if(wantLog) log.push({r, dA, dB, a:liveA.length, b:liveB.length});
+  }
+  return {win: liveA.length > 0 && liveB.length === 0, A, B, rounds:r, log};
+}
+function simChance(allies, foes, sims){
+  if(!allies.length) return 0;
+  let w = 0;
+  for(let i = 0; i < sims; i++) if(fight(allies, foes, false).win) w++;
+  return w / sims;
+}
+const simCount = (a, b) => Math.max(40, Math.min(200, Math.floor(40000 / (a + b + 1))));
+const allUnits = map => { const a = []; for(const s of SEEDS){ const n = map[s.id] || 0; for(let k = 0; k < n; k++) a.push({type:s.id, atk:s.atk, hp:s.hp}); } return a; };
+const foeUnits = e => { const a = []; for(const g of e.groups) for(let k = 0; k < g.n; k++) a.push({type:g.name, atk:g.atk, hp:g.hp}); return a; };
+
+/* ---------- Spielstand ---------- */
+let state, view = 'farm', raid = null, sheetCtx = null, sheetTick = null, armed = false, armedT = 0, msgs = [], plotEls = [];
+const $ = id => document.getElementById(id);
+
+function fresh(){
+  const now = Date.now(), unlocked = Array(N).fill(false), plots = Array(N).fill(null);
+  for(let r = 1; r <= 3; r++) for(let c = 1; c <= 3; c++) unlocked[r * COLS + c] = true;
+  const dur = SEED.schlurfer.time * 1000;
+  plots[6]  = {seed:'schlurfer', t0:now - dur - 2000, dur};
+  plots[7]  = {seed:'schlurfer', t0:now - Math.round(dur * .62), dur};
+  plots[8]  = {seed:'schlurfer', t0:now - Math.round(dur * .3), dur};
+  plots[11] = {seed:'schlurfer', t0:now - Math.round(dur * .8), dur};
+  return {v:1, coins:80, brains:3, level:1, xp:0, unlocked, plots, army:{schlurfer:2}, sel:'schlurfer', stats:{harvested:0, wins:0}, lastSeen:now};
+}
+function valid(s){
+  return s && s.v === 1 && Array.isArray(s.unlocked) && s.unlocked.length === N && Array.isArray(s.plots) && s.plots.length === N
+    && typeof s.coins === 'number' && typeof s.brains === 'number' && typeof s.level === 'number' && typeof s.xp === 'number'
+    && s.army && typeof s.army === 'object';
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!valid(s)) return null;
+    s.plots = s.plots.map(p => p && SEED[p.seed] ? p : null);
+    if(!s.stats) s.stats = {harvested:0, wins:0};
+    if(!SEED[s.sel]) s.sel = 'schlurfer';
+    return s;
+  }catch(e){ return null; }
+}
+function save(){
+  try{ state.lastSeen = Date.now(); localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+}
+
+/* ---------- Hilfen ---------- */
+const unlockedCount = () => state.unlocked.filter(Boolean).length;
+const landPrice = () => Math.round(40 * Math.pow(1.14, unlockedCount() - 9));
+const armyCount = () => SEEDS.reduce((n, s) => n + (state.army[s.id] || 0), 0);
+const isReady = (p, now) => now >= p.t0 + p.dur;
+const say = m => { msgs.push(m); };
+let toastT = 0;
+function toast(m){
+  const t = $('toast'); t.textContent = m; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2800);
+}
+function flush(){ if(msgs.length){ toast(msgs.join(' ')); msgs = []; } }
+
+function addXp(n){
+  state.xp += n;
+  while(state.xp >= xpNeed(state.level)){
+    state.xp -= xpNeed(state.level);
+    state.level++;
+    state.brains += 2;
+    const nw = SEEDS.filter(s => s.lvl === state.level).map(s => s.name);
+    say('Stufe ' + state.level + '! +2 Hirne.' + (nw.length ? ' Neue Samen: ' + nw.join(', ') + '.' : ''));
+  }
+}
+
+/* ---------- Anzeige ---------- */
+function hud(){
+  $('coins').textContent = fmtN(state.coins);
+  $('brains').textContent = fmtN(state.brains);
+  $('chipCoins').setAttribute('aria-label', 'Münzen: ' + fmtN(state.coins));
+  $('chipBrains').setAttribute('aria-label', 'Hirne: ' + fmtN(state.brains));
+  $('lvl').textContent = state.level;
+  const need = xpNeed(state.level);
+  $('xpbar').style.width = Math.min(100, state.xp / need * 100).toFixed(1) + '%';
+  $('xptxt').textContent = fmtN(state.xp) + ' / ' + fmtN(need) + ' EP';
+}
+function renderSeeds(){
+  $('seeds').innerHTML = SEEDS.map(s => {
+    const lock = s.lvl > state.level, poor = !lock && state.coins < s.cost;
+    return `<button type="button" class="seed${lock ? ' lock' : ''}${poor ? ' poor' : ''}" data-seed="${s.id}" aria-pressed="${state.sel === s.id}">${zart(s.id)}<span class="n">${s.name}</span><span class="m">${lock ? 'ab Stufe ' + s.lvl : '<b>' + s.cost + '</b> · ' + fmt(s.time)}</span></button>`;
+  }).join('');
+}
+function renderPlot(i){
+  const el = plotEls[i], now = Date.now(), p = state.plots[i];
+  let sig, cls, label;
+  if(!state.unlocked[i]){ sig = 'L'; cls = 'locked'; label = 'Überwucherte Fläche'; }
+  else if(!p){ sig = 'E'; cls = 'empty'; label = 'Leeres Feld'; }
+  else if(isReady(p, now)){ sig = 'R' + p.seed; cls = 'ready'; label = SEED[p.seed].name + ' ist reif, ernten'; }
+  else { sig = 'G' + p.seed; cls = 'grow'; label = SEED[p.seed].name + ' wächst'; }
+  if(el.dataset.sig !== sig){
+    el.dataset.sig = sig;
+    el.className = 'plot ' + cls;
+    el.setAttribute('aria-label', label);
+    if(sig === 'L') el.innerHTML = WEED + '<span class="price"></span>';
+    else if(sig === 'E') el.innerHTML = '<span class="plus" aria-hidden="true">+</span>';
+    else el.innerHTML = plotSVG(i, p.seed) + '<span class="timer"></span>';
+  }
+  if(sig === 'L'){
+    const price = landPrice();
+    el.querySelector('.price').textContent = fmtN(price);
+    el.setAttribute('aria-label', 'Überwucherte Fläche, roden für ' + fmtN(price) + ' Münzen');
+  }
+  if(sig[0] === 'R'){
+    el.querySelector('.rise').setAttribute('transform', 'translate(0 0)');
+    el.querySelector('.timer').textContent = 'Ernten';
+  }
+  if(sig[0] === 'G') updPlot(i, now);
+}
+function updPlot(i, now){
+  const el = plotEls[i], p = state.plots[i];
+  const left = p.t0 + p.dur - now, prog = Math.min(1, Math.max(0, 1 - left / p.dur));
+  el.querySelector('.rise').setAttribute('transform', 'translate(0 ' + ((1 - prog) * 56).toFixed(1) + ')');
+  el.querySelector('.timer').textContent = fmt(Math.ceil(left / 1000));
+}
+function renderPlots(){ for(let i = 0; i < N; i++) renderPlot(i); }
+function updFoot(){
+  const now = Date.now(); let ready = 0, grow = 0, free = 0;
+  for(let i = 0; i < N; i++){
+    if(!state.unlocked[i]) continue;
+    const p = state.plots[i];
+    if(!p) free++; else if(isReady(p, now)) ready++; else grow++;
+  }
+  $('harvestAll').textContent = ready ? 'Alle ernten (' + ready + ')' : 'Alle ernten';
+  $('harvestAll').disabled = !ready;
+  $('footinfo').textContent = ready + ' reif · ' + grow + ' wachsen · ' + free + ' frei';
+}
+function floater(i, text){
+  const f = document.createElement('span'); f.className = 'float'; f.textContent = text;
+  plotEls[i].appendChild(f); setTimeout(() => f.remove(), 950);
+}
+
+function renderArmy(){
+  let A = 0, H = 0, T = 0;
+  for(const s of SEEDS){ const n = state.army[s.id] || 0; T += n; A += n * s.atk; H += n * s.hp; }
+  $('v-army').innerHTML = `<h2>Dein Heer</h2><p class="muted">${T} Zombies · Angriff ${fmtN(A)} · Leben ${fmtN(H)}</p><div class="rows">` + SEEDS.map(s => {
+    const n = state.army[s.id] || 0;
+    return `<div class="row${n ? '' : ' none'}">${zart(s.id)}<div><div class="t">${s.name}</div><div class="s">Angriff ${s.atk} · Leben ${s.hp}</div></div><span class="count">${n}</span>`
+      + (n ? `<div class="sells"><button type="button" class="btn ghost small" data-sell="${s.id}">Verkaufen +${s.sell}</button>${n > 2 ? `<button type="button" class="btn ghost small" data-sell="${s.id}" data-all="1">Alle (${n})</button>` : ''}</div>` : '')
+      + '</div>';
+  }).join('') + `</div><div class="reset"><button type="button" class="btn ghost small danger" data-reset>${armed ? 'Wirklich alles löschen?' : 'Spielstand löschen'}</button></div>`;
+}
+function pctClass(c){ return c >= .75 ? 'hi' : c >= .4 ? 'mid' : 'lo'; }
+function renderRaid(){
+  const all = allUnits(state.army);
+  $('v-raid').innerHTML = '<h2>Raubzug</h2><p class="muted">Schicke Zombies gegen Menschen. Wer fällt, ist weg.</p><div class="rows">' + ENEMIES.map(e => {
+    const lock = e.lvl > state.level;
+    const foes = foeUnits(e);
+    let chance = '';
+    if(!lock){
+      if(all.length){ const c = simChance(all, foes, Math.min(60, simCount(all.length, foes.length))); chance = `<span class="pct ${pctClass(c)}">Siegchance mit allen: ca. ${Math.round(c * 100)} %</span>`; }
+      else chance = '<span class="pct">Du hast keine Zombies.</span>';
+    }
+    return `<div class="card${lock ? ' lock' : ''}"><h3>${e.name}</h3><p>${e.text}</p>`
+      + '<p class="foes">' + e.groups.map(g => g.n + '× ' + g.name + ' (Angriff ' + g.atk + ', Leben ' + g.hp + ')').join('<br>') + '</p>'
+      + `<div class="foot"><div class="rew"><span>${fmtN(e.coins)} Münzen</span><span>${e.xp} EP</span></div>${lock ? '<span class="pct">ab Stufe ' + e.lvl + '</span>' : chance}</div>`
+      + `<div class="foot"><span></span><button type="button" class="btn" data-raid="${e.id}"${lock ? ' disabled' : ''}>Aufstellen</button></div></div>`;
+  }).join('') + '</div>';
+}
+function renderView(){
+  if(view === 'army') renderArmy();
+  if(view === 'raid') renderRaid();
+}
+function setView(v){
+  view = v;
+  for(const k of ['farm', 'army', 'raid']) $('v-' + k).hidden = k !== v;
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  renderView();
+  $('main').scrollTop = 0;
+}
+function commit(){
+  hud(); renderSeeds(); updFoot(); renderView(); save(); flush();
+}
+
+/* ---------- Aktionen ---------- */
+function onPlot(i){
+  if(!state.unlocked[i]) return openLand(i);
+  const p = state.plots[i];
+  if(!p) return plant(i);
+  if(isReady(p, Date.now())) return harvest(i);
+  openGrow(i);
+}
+function plant(i){
+  const s = SEED[state.sel];
+  if(!s || s.lvl > state.level) return toast('Wähle zuerst Samen aus.');
+  if(state.coins < s.cost) return toast('Dir fehlen ' + fmtN(s.cost - state.coins) + ' Münzen für ' + s.name + '.');
+  state.coins -= s.cost;
+  state.plots[i] = {seed:s.id, t0:Date.now(), dur:s.time * 1000};
+  addXp(1);
+  renderPlot(i); commit();
+}
+function harvest(i, silent){
+  const p = state.plots[i], s = SEED[p.seed];
+  state.army[s.id] = (state.army[s.id] || 0) + 1;
+  state.plots[i] = null; state.stats.harvested++;
+  addXp(xpHarvest(s));
+  renderPlot(i); floater(i, '+1 ' + s.name);
+  if(!silent) commit();
+}
+function harvestAll(){
+  const now = Date.now(); let n = 0;
+  for(let i = 0; i < N; i++){
+    const p = state.plots[i];
+    if(state.unlocked[i] && p && isReady(p, now)){ harvest(i, true); n++; }
+  }
+  if(n) msgs.unshift(n + (n === 1 ? ' Zombie geerntet.' : ' Zombies geerntet.'));
+  commit();
+}
+function sell(id, all){
+  const n = state.army[id] || 0; if(!n) return;
+  const k = all ? n : 1, gain = k * SEED[id].sell;
+  state.army[id] = n - k; state.coins += gain;
+  say(k + '× ' + SEED[id].name + ' verkauft, +' + fmtN(gain) + ' Münzen.');
+  commit();
+}
+
+/* ---------- Sheets ---------- */
+function openSheet(html, ctx, tick){
+  $('sheetBody').innerHTML = html; sheetCtx = ctx; sheetTick = tick || null;
+  $('sheet').hidden = false; $('panel').scrollTop = 0; $('panel').focus();
+}
+function closeSheet(){ $('sheet').hidden = true; sheetCtx = null; sheetTick = null; }
+
+function openGrow(i){
+  const p = state.plots[i], s = SEED[p.seed];
+  openSheet(`<h2>${s.name} wächst</h2><p class="muted" style="margin:0">Angriff ${s.atk} · Leben ${s.hp}</p>
+    <div class="bar"><i id="gbar"></i></div><p class="big" id="gtime"></p>
+    <div class="btns"><button type="button" class="btn" id="gfert" data-act="fert">Düngen · 1 Hirn</button><button type="button" class="btn ghost danger" data-act="dig">Ausgraben</button></div>
+    <p class="fine">Düngen lässt den Zombie sofort aus der Erde steigen. Beim Ausgraben geht der Samen verloren.</p>`,
+    {kind:'grow', i}, () => {
+      const q = state.plots[i];
+      if(!q) return closeSheet();
+      const left = q.t0 + q.dur - Date.now();
+      if(left <= 0) return closeSheet();
+      $('gbar').style.width = (100 * (1 - left / q.dur)).toFixed(1) + '%';
+      $('gtime').textContent = fmt(Math.ceil(left / 1000));
+    });
+  sheetTick(); $('gfert').disabled = state.brains < 1;
+}
+function openLand(i){
+  const price = landPrice(), poor = state.coins < price;
+  openSheet(`<h2>Wildwuchs roden</h2><p class="muted">Das Feld ist überwuchert. Nach dem Roden kannst du dort säen.</p>
+    <div class="btns"><button type="button" class="btn" data-act="land"${poor ? ' disabled' : ''}>Roden · ${fmtN(price)} Münzen</button><button type="button" class="btn ghost" data-close>Abbrechen</button></div>
+    ${poor ? '<p class="fine">Dir fehlen ' + fmtN(price - state.coins) + ' Münzen.</p>' : ''}`, {kind:'land', i});
+}
+function openRaid(eid){
+  raid = {eid, sel:{}};
+  for(const s of SEEDS) if(state.army[s.id]) raid.sel[s.id] = state.army[s.id];
+  renderRaidSheet();
+}
+function renderRaidSheet(){
+  const e = ENEMY[raid.eid], owned = SEEDS.filter(s => (state.army[s.id] || 0) > 0);
+  const allies = allUnits(raid.sel), foes = foeUnits(e);
+  let A = 0, H = 0, fA = 0, fH = 0;
+  for(const u of allies){ A += u.atk; H += u.hp; }
+  for(const u of foes){ fA += u.atk; fH += u.hp; }
+  let chanceHTML = '<div class="chance">Wähle Zombies für den Angriff.</div>';
+  if(allies.length){
+    const c = simChance(allies, foes, simCount(allies.length, foes.length));
+    chanceHTML = `<div class="chance pct ${pctClass(c)}">Siegchance ca. ${Math.round(c * 100)} %</div>`;
+  }
+  const rows = owned.length ? owned.map(s => {
+    const n = raid.sel[s.id] || 0, max = state.army[s.id];
+    return `<div class="sq">${zart(s.id)}<div><b>${s.name}</b><small>Angriff ${s.atk} · Leben ${s.hp}</small></div>
+      <div class="step"><button type="button" data-act="dec" data-id="${s.id}" aria-label="Einen ${s.name} weniger"${n < 1 ? ' disabled' : ''}>−</button><span>${n}<small> / ${max}</small></span><button type="button" data-act="inc" data-id="${s.id}" aria-label="Einen ${s.name} mehr"${n >= max ? ' disabled' : ''}>+</button></div></div>`;
+  }).join('') : '<p class="muted">Du hast keine Zombies. Ernte zuerst welche auf dem Hof.</p>';
+  openSheet(`<h2>${e.name}</h2><p class="muted" style="margin:0">${e.groups.map(g => g.n + '× ' + g.name).join(', ')}</p>
+    <div style="margin-top:8px">${rows}</div>
+    <div class="sum"><span>Du: Angriff ${fmtN(A)} · Leben ${fmtN(H)}</span><span>Gegner: Angriff ${fmtN(fA)} · Leben ${fmtN(fH)}</span></div>
+    ${chanceHTML}
+    <div class="btns"><button type="button" class="btn ghost" data-act="all">Alle</button><button type="button" class="btn ghost" data-act="none">Keine</button><button type="button" class="btn" data-act="go"${allies.length ? '' : ' disabled'}>Angreifen</button></div>`,
+    {kind:'raid'});
+}
+function attack(){
+  const e = ENEMY[raid.eid], sel = raid.sel, allies = allUnits(sel);
+  if(!allies.length) return;
+  for(const id in sel) state.army[id] = (state.army[id] || 0) - sel[id];
+  const res = fight(allies, foeUnits(e), true);
+  const alive = {};
+  for(const u of res.A) if(u.hp > 0) alive[u.type] = (alive[u.type] || 0) + 1;
+  const lost = [];
+  for(const id in sel){
+    const back = alive[id] || 0;
+    state.army[id] = (state.army[id] || 0) + back;
+    if(sel[id] - back > 0) lost.push((sel[id] - back) + '× ' + SEED[id].name);
+  }
+  let rew = '';
+  msgs = [];
+  if(res.win){
+    const coins = Math.round(e.coins * (0.9 + Math.random() * 0.2));
+    const brains = Math.random() < e.brain ? (e.brainN || 1) : 0;
+    state.coins += coins; state.brains += brains; state.stats.wins++;
+    addXp(e.xp);
+    rew = `<div class="rew" style="margin-bottom:10px"><span>+${fmtN(coins)} Münzen</span><span>+${e.xp} EP</span>${brains ? '<span>+' + brains + (brains === 1 ? ' Hirn' : ' Hirne') + '</span>' : ''}</div>`;
+  }
+  const extra = msgs.join(' '); msgs = [];
+  const log = res.log.map(l => `<div>Runde ${l.r}: du ${l.dA}, Gegner ${l.dB} Schaden · ${l.a} gegen ${l.b}</div>`).join('');
+  const head = res.win ? '<p class="result-h win">Sieg</p>' : (res.A.some(u => u.hp > 0) ? '<p class="result-h lose">Rückzug</p>' : '<p class="result-h lose">Niederlage</p>');
+  const survivors = res.A.filter(u => u.hp > 0).length;
+  openSheet(`${head}<div class="lines"><p>${e.name} · ${res.rounds} Runden</p><p>${survivors} von ${allies.length} Zombies kehren zurück${lost.length ? '. Verloren: ' + lost.join(', ') : ''}.</p></div>
+    ${rew}${extra ? '<p class="fine" style="margin:0 0 10px">' + extra + '</p>' : ''}
+    <div class="log">${log}</div><div class="btns"><button type="button" class="btn" data-close>Weiter</button></div>`, {kind:'result'});
+  raid = null; commit();
+}
+
+function act(a, ds){
+  const c = sheetCtx; if(!c) return;
+  if(a === 'fert'){
+    const p = state.plots[c.i]; if(!p || state.brains < 1) return;
+    state.brains--; p.t0 = Date.now() - p.dur;
+    closeSheet(); renderPlot(c.i); say('Der Zombie steigt aus der Erde.'); commit();
+  }else if(a === 'dig'){
+    state.plots[c.i] = null; closeSheet(); renderPlot(c.i); commit();
+  }else if(a === 'land'){
+    const price = landPrice(); if(state.coins < price) return;
+    state.coins -= price; state.unlocked[c.i] = true;
+    closeSheet(); renderPlots(); addXp(2); commit();
+  }else if(c.kind === 'raid'){
+    if(a === 'inc'){ const m = state.army[ds.id] || 0; raid.sel[ds.id] = Math.min(m, (raid.sel[ds.id] || 0) + 1); renderRaidSheet(); }
+    else if(a === 'dec'){ raid.sel[ds.id] = Math.max(0, (raid.sel[ds.id] || 0) - 1); renderRaidSheet(); }
+    else if(a === 'all'){ raid.sel = {}; for(const s of SEEDS) if(state.army[s.id]) raid.sel[s.id] = state.army[s.id]; renderRaidSheet(); }
+    else if(a === 'none'){ raid.sel = {}; renderRaidSheet(); }
+    else if(a === 'go') attack();
+  }
+}
+
+/* ---------- Start ---------- */
+function tick(){
+  const now = Date.now(); let changed = false;
+  for(let i = 0; i < N; i++){
+    const p = state.plots[i];
+    if(!state.unlocked[i] || !p) continue;
+    const ready = isReady(p, now), isR = plotEls[i].dataset.sig[0] === 'R';
+    if(ready && !isR){ renderPlot(i); changed = true; }
+    else if(!ready) updPlot(i, now);
+  }
+  if(changed || now % 2000 < 260) updFoot();
+  if(sheetTick) sheetTick();
+}
+function start(data){
+  state = (data && data.state && valid(data.state)) ? data.state : (load() || fresh());
+  for(let i = 0; i < N; i++) if(state.plots[i] && !SEED[state.plots[i].seed]) state.plots[i] = null;
+  const away = Date.now() - (state.lastSeen || Date.now());
+
+  $('farm').innerHTML = Array.from({length:N}, (_, i) => `<button type="button" class="plot" data-i="${i}"></button>`).join('');
+  plotEls = Array.from($('farm').children);
+
+  $('farm').addEventListener('click', e => { const b = e.target.closest('.plot'); if(b) onPlot(+b.dataset.i); });
+  $('seeds').addEventListener('click', e => {
+    const b = e.target.closest('[data-seed]'); if(!b) return;
+    const s = SEED[b.dataset.seed];
+    if(s.lvl > state.level) return toast(s.name + ' gibt es ab Stufe ' + s.lvl + '.');
+    state.sel = s.id; renderSeeds(); save();
+  });
+  $('harvestAll').addEventListener('click', harvestAll);
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  $('v-army').addEventListener('click', e => {
+    const s = e.target.closest('[data-sell]');
+    if(s) return sell(s.dataset.sell, !!s.dataset.all);
+    if(e.target.closest('[data-reset]')){
+      if(!armed){ armed = true; renderArmy(); clearTimeout(armedT); armedT = setTimeout(() => { armed = false; if(view === 'army') renderArmy(); }, 4000); return; }
+      armed = false; try{ localStorage.removeItem(KEY); }catch(err){}
+      state = fresh(); renderPlots(); commit(); setView('farm'); toast('Neuer Hof, neues Glück.');
+    }
+  });
+  $('v-raid').addEventListener('click', e => { const b = e.target.closest('[data-raid]'); if(b && !b.disabled) openRaid(b.dataset.raid); });
+  $('sheet').addEventListener('click', e => {
+    if(e.target.closest('[data-close]')) return closeSheet();
+    const b = e.target.closest('[data-act]'); if(!b || b.disabled) return;
+    act(b.dataset.act, b.dataset);
+  });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('sheet').hidden) closeSheet(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+
+  renderPlots(); hud(); renderSeeds(); updFoot();
+  if(away > 20000){
+    const now = Date.now(); let n = 0;
+    for(let i = 0; i < N; i++){ const p = state.plots[i]; if(state.unlocked[i] && p && isReady(p, now)) n++; }
+    if(n) toast('Willkommen zurück. ' + n + (n === 1 ? ' Zombie ist' : ' Zombies sind') + ' erntereif.');
+  }
+  setInterval(tick, 250);
+  setInterval(save, 5000);
+  try{ window.claude?.hot?.snapshot?.(() => ({state})); }catch(e){}
+}
+if(typeof document !== 'undefined'){
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+}
+</script>
+<script>if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
+</body>
+</html>
